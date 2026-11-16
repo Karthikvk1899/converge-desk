@@ -41,3 +41,15 @@ it("enforces actual payload limit, strict shape and defensive headers", async ()
   expect(unknown.headers["cache-control"]).toBe("no-store");
   expect(unknown.headers["x-content-type-options"]).toBe("nosniff");
 });
+
+it("rejects NUL-bearing document content and titles at the HTTP boundary", async () => {
+  for (const payload of [
+    { title: "bad\0title" },
+    { title: "valid", body: "bad\0body" },
+  ]) {
+    expect(
+      (await app.inject({ method: "POST", url: "/api/documents", payload }))
+        .statusCode,
+    ).toBe(400);
+  }
+});

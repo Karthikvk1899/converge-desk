@@ -21,6 +21,8 @@ export function merge(base: Uint8Array, update: Uint8Array) {
     )
       throw new Error("plain text only");
     const body = text.toString();
+    if (body.includes("\0"))
+      throw new Error("NUL characters are not supported");
     const state = Y.encodeStateAsUpdate(doc);
     if (body.length > MAX_TEXT || state.byteLength > MAX_STATE)
       throw new Error("document capacity reached");
@@ -30,6 +32,8 @@ export function merge(base: Uint8Array, update: Uint8Array) {
   }
 }
 export function initial(body: string) {
+  if (body.includes("\0") || body.length > MAX_TEXT)
+    throw new Error("invalid document text");
   const doc = new Y.Doc();
   try {
     doc.getText("body").insert(0, body);

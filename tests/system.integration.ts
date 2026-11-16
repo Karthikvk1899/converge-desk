@@ -71,6 +71,20 @@ describe("two real replicas with PostgreSQL and Redis", () => {
     ).json();
     expect(saved.seq).toBe(1);
     expect(saved.body).toBe("first");
+    const invalid = await join(a.token, d.id);
+    const nul = invalid.send(invalid.edit("bad\0text"));
+    await until(() =>
+      invalid.events.find(
+        (e) =>
+          e.type === "error" &&
+          e.op_id === nul &&
+          e.code === "422" &&
+          !e.retryable,
+      ),
+    );
+    expect(
+      (await (await request("/api/documents/" + d.id, a.token)).json()).seq,
+    ).toBe(1);
   });
   it("enforces viewer permissions, tenant isolation and administrative separation", async () => {
     const { tenant, a, d } = await setup();

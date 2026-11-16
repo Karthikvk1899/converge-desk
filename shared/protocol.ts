@@ -3,7 +3,10 @@ export const MAX_UPDATE = 32768;
 export const MAX_STATE = 524288;
 export const MAX_TEXT = 100000;
 export const names = z.string().regex(/^[a-z][a-z0-9-]{1,62}$/);
-export const title = z.string().trim().min(1).max(120);
+export const plainText = z
+  .string()
+  .regex(/^[^\u0000]*$/, "NUL characters are not supported");
+export const title = plainText.trim().min(1).max(120);
 export const writeMessage = z
   .object({
     type: z.literal("update"),
@@ -14,12 +17,12 @@ export const writeMessage = z
 export const newPrincipal = z
   .object({
     tenant: names,
-    name: z.string().trim().min(1).max(60),
+    name: plainText.trim().min(1).max(60),
     role: z.enum(["editor", "viewer"]),
   })
   .strict();
 export const newDocument = z
-  .object({ title, body: z.string().max(MAX_TEXT).default("") })
+  .object({ title, body: plainText.max(MAX_TEXT).default("") })
   .strict();
 export const newCheckpoint = z
   .object({

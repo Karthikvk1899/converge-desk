@@ -56,6 +56,8 @@ Codes:409 conflicting op ID;422 invalid/bounded CRDT;401/403/404 lost access;503
 
 ## Resource bounds
 
+NUL characters are rejected in persisted text fields and CRDT content because PostgreSQL text cannot represent them. Malformed content must fail permanently rather than enter a dependency-retry loop.
+
 32KiB decoded update,512KiB full CRDT state,100,000 visible text characters;64KiB HTTP/WebSocket transport envelope. At most100 live sockets and4 merge workers per API process,16 queued inbound messages per socket,30-message burst with10/second refill. Slow consumers exceeding1MiB buffered output reconnect. HTTP rate limiting is300 requests/minute per source IP per replica, not a distributed tenant quota. A proxy can aggregate clients into one IP.
 
 The editor limits one inserted chunk to4,000 characters, protects the document cap, and becomes read-only above200 locally pending operations. These are usability protections, not trusted server validation. IndexedDB storage is not guaranteed. Presence expires after15 seconds without refresh and is not an authorization or durability signal.

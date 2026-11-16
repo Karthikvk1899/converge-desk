@@ -91,3 +91,9 @@ describe("CRDT persistence boundary", () => {
     }
   });
 });
+
+it("rejects NUL text before it can enter a PostgreSQL retry loop", () => {
+  const base = initial("valid");
+  expect(() => merge(base, edit(base, "bad\0text"))).toThrow("NUL");
+  expect(() => initial("bad\0text")).toThrow("invalid document text");
+});

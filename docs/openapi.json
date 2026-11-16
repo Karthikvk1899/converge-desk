@@ -30,7 +30,8 @@
                   "name": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 60
+                    "maxLength": 60,
+                    "pattern": "^[^\\u0000]*$"
                   },
                   "role": {
                     "type": "string",
@@ -102,12 +103,14 @@
                   "title": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 120
+                    "maxLength": 120,
+                    "pattern": "^[^\\u0000]*$"
                   },
                   "body": {
                     "default": "",
                     "type": "string",
-                    "maxLength": 100000
+                    "maxLength": 100000,
+                    "pattern": "^[^\\u0000]*$"
                   }
                 },
                 "required": [
@@ -227,7 +230,8 @@
                   "label": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 120
+                    "maxLength": 120,
+                    "pattern": "^[^\\u0000]*$"
                   },
                   "expected_seq": {
                     "type": "integer",
@@ -300,7 +304,8 @@
                   "title": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 120
+                    "maxLength": 120,
+                    "pattern": "^[^\\u0000]*$"
                   }
                 },
                 "required": [
