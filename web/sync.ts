@@ -29,6 +29,7 @@ export class Sync {
     durable: true,
   };
   private stopped = false;
+  private pendingSaves = 0;
   private socket: WebSocket | null = null;
   private work = Promise.resolve();
   private flushTimer: ReturnType<typeof setTimeout> | undefined;
@@ -78,11 +79,13 @@ export class Sync {
       const state = Y.encodeStateAsUpdate(this.doc);
       const local = origin !== "remote" && origin !== "bootstrap";
       const operation = local ? { id: crypto.randomUUID(), update } : undefined;
+      this.pendingSaves++;
       this.state.durable = false;
       this.emit();
       void this.enqueue(async () => {
         await this.cache.save(this.scope, state, operation);
-        this.state.durable = true;
+        this.pendingSaves--;
+        this.state.durable = this.pendingSaves === 0;
         await this.flush();
         this.emit();
       });

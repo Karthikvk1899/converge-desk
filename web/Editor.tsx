@@ -4,7 +4,11 @@ import { EditorState, Compartment } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { basicSetup } from "codemirror";
 import { markdown } from "@codemirror/lang-markdown";
-import { yCollab, yUndoManagerKeymap } from "y-codemirror.next";
+import {
+  yCollab,
+  yUndoManagerKeymap,
+  ySyncAnnotation,
+} from "y-codemirror.next";
 export function Editor({ doc, readOnly }: { doc: Y.Doc; readOnly: boolean }) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
@@ -29,7 +33,7 @@ export function Editor({ doc, readOnly }: { doc: Y.Doc; readOnly: boolean }) {
             "aria-multiline": "true",
           }),
           EditorState.transactionFilter.of((tr) => {
-            if (!tr.docChanged) return tr;
+            if (!tr.docChanged || tr.annotation(ySyncAnnotation)) return tr;
             if (tr.newDoc.length > 100000) return [];
             let tooLarge = false;
             tr.changes.iterChanges((_a, _b, _c, _d, inserted) => {

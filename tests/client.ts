@@ -16,7 +16,7 @@ export async function request(
     method,
     headers: {
       Authorization: "Bearer " + token,
-      "Content-Type": "application/json",
+      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
     signal: AbortSignal.timeout(10000),
