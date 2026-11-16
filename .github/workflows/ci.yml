@@ -1,26 +1,88 @@
-name: Publish source
-on: [push, workflow_dispatch]
+name: CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  publish:
-    if: github.actor == 'Karthikvk1899'
+  checks:
+    name: TypeScript, unit, build, dependency audit
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Materialize reviewed source
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with: {node-version: '24', cache: npm}
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm audit --audit-level=moderate
+      - run: node scripts/openapi.ts && git diff --exit-code docs/openapi.json
+  integration:
+    name: Two replicas, browser collaboration, failure recovery
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with: {node-version: '24', cache: npm}
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Start quickstart stack
         run: |
-          python3 - <<'PYTHON'
-          import base64,json,pathlib,zlib
-          files=json.loads(zlib.decompress(base64.b64decode('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')))
-          for name,content in files.items():
-              path=pathlib.Path(name)
-              assert not path.is_absolute() and '..' not in path.parts
-              path.parent.mkdir(parents=True,exist_ok=True)
-              path.write_text(content)
-          PYTHON
-          git config user.name "Karthik Beesa"
-          git config user.email "261053759+Karthikvk1899@users.noreply.github.com"
-          git add .
-          git diff --cached --quiet || git commit -m "Harden browser recovery and authorization regression coverage"
-          git push
+          node scripts/init-env.mjs
+          docker compose up -d --build --wait
+          docker compose exec -e API_A=http://localhost:8080 api1 node scripts/seed.ts > /dev/null
+      - name: API and WebSocket integration
+        run: docker compose run --build --rm --no-deps integration
+      - name: Real browser collaboration and offline recovery
+        run: |
+          set -a
+          . ./.env
+          set +a
+          npm run e2e
+      - name: Redis, replica, and PostgreSQL interruption
+        run: |
+          set -a
+          . ./.env
+          set +a
+          node scripts/faults.ts
+      - name: Isolated PostgreSQL backup and restoration
+        run: |
+          set -a
+          . ./.env
+          set +a
+          node scripts/backup-restore.ts
+      - name: Container logs
+        if: failure()
+        run: docker compose logs --no-color --tail=120
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: browser-evidence
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+      - if: always()
+        run: docker compose down -v
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066
+        with:
+          languages: javascript-typescript
+          build-mode: none
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066
