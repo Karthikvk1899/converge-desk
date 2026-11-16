@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import * as Y from "yjs";
-import { EditorState, Compartment } from "@codemirror/state";
+import { EditorState, Compartment, Prec } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { basicSetup } from "codemirror";
 import { markdown } from "@codemirror/lang-markdown";
@@ -24,7 +24,7 @@ export function Editor({ doc, readOnly }: { doc: Y.Doc; readOnly: boolean }) {
           basicSetup,
           markdown(),
           EditorView.lineWrapping,
-          keymap.of(yUndoManagerKeymap),
+          Prec.highest(keymap.of(yUndoManagerKeymap)),
           yCollab(text, null, { undoManager: undo }),
           mode.current.of(EditorState.readOnly.of(readOnly)),
           EditorView.contentAttributes.of({

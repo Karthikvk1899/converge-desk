@@ -91,6 +91,48 @@ describe("two real replicas with PostgreSQL and Redis", () => {
         .status,
     ).toBe(403);
     expect((await request("/api/me", process.env.ADMIN_KEY!)).status).toBe(401);
+    for (const suffix of ["history", "checkpoints"]) {
+      expect(
+        (await request(`/api/documents/${d.id}/${suffix}`, outsider.token))
+          .status,
+      ).toBe(404);
+    }
+    expect(
+      (
+        await request(
+          `/api/documents/${d.id}/checkpoints`,
+          viewer.token,
+          "POST",
+          { label: "forbidden", expected_seq: 0 },
+        )
+      ).status,
+    ).toBe(403);
+    const checkpoint = await (
+      await request(`/api/documents/${d.id}/checkpoints`, a.token, "POST", {
+        label: "isolated",
+        expected_seq: 0,
+      })
+    ).json();
+    expect(
+      (
+        await request(
+          `/api/checkpoints/${checkpoint.id}/fork`,
+          outsider.token,
+          "POST",
+          { title: "denied" },
+        )
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await request(
+          `/api/checkpoints/${checkpoint.id}/fork`,
+          viewer.token,
+          "POST",
+          { title: "denied" },
+        )
+      ).status,
+    ).toBe(403);
     const p = await join(viewer.token, d.id);
     p.send(p.edit("forbidden"));
     await until(() =>

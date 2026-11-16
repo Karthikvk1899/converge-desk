@@ -29,7 +29,11 @@ export class Sync {
     durable: true,
   };
   private stopped = false;
+  private stopWork: Promise<void> | undefined;
   private pendingSaves = 0;
+  private storageFailed = false;
+  private opening: AbortController | undefined;
+  private handshake: ReturnType<typeof setTimeout> | undefined;
   private socket: WebSocket | null = null;
   private work = Promise.resolve();
   private flushTimer: ReturnType<typeof setTimeout> | undefined;
@@ -42,7 +46,7 @@ export class Sync {
   private onChange: () => void;
   private offline = () => {
     this.socket?.close();
-    this.state.status = "offline";
+    if (this.state.status !== "blocked") this.state.status = "offline";
     this.emit();
   };
   private online = () => {
@@ -62,6 +66,8 @@ export class Sync {
   }
   private enqueue(task: () => Promise<void>) {
     this.work = this.work.then(task).catch(() => {
+      this.storageFailed = true;
+      this.state.status = "blocked";
       this.state.durable = false;
       this.state.error =
         "Local storage failed. Export this document before closing the tab.";
@@ -85,7 +91,7 @@ export class Sync {
       void this.enqueue(async () => {
         await this.cache.save(this.scope, state, operation);
         this.pendingSaves--;
-        this.state.durable = this.pendingSaves === 0;
+        this.state.durable = !this.storageFailed && this.pendingSaves === 0;
         await this.flush();
         this.emit();
       });
@@ -97,12 +103,15 @@ export class Sync {
       void this.enqueue(() => this.flush());
       if (!this.socket || this.socket.readyState === 3) void this.connect();
     }, 3000);
-    await this.connect();
+    if (!navigator.onLine) this.state.status = "offline";
+    this.emit();
+    void this.connect();
   }
   async connect() {
     if (
       this.stopped ||
       this.connecting ||
+      (this.socket !== null && this.socket.readyState < 2) ||
       this.state.status === "blocked" ||
       !navigator.onLine
     )
@@ -110,9 +119,12 @@ export class Sync {
     this.connecting = true;
     this.state.status = "connecting";
     this.emit();
+    this.opening = new AbortController();
+    const deadline = setTimeout(() => this.opening?.abort(), 10000);
     try {
       const response = await fetch(`/api/documents/${this.id}/tickets`, {
         method: "POST",
+        signal: this.opening.signal,
         headers: { Authorization: "Bearer " + this.token },
       });
       if (!response.ok) {
@@ -133,17 +145,23 @@ export class Sync {
       const socket = new WebSocket(url);
       this.socket = socket;
       this.initialized = false;
+      this.handshake = setTimeout(() => {
+        if (this.socket === socket && !this.initialized) socket.close();
+      }, 10000);
       socket.onmessage = (e) => {
         void this.enqueue(async () => {
           if (this.stopped || this.socket !== socket) return;
           const message = JSON.parse(e.data) as ServerMessage;
           if (message.type === "hello") {
+            clearTimeout(this.handshake);
             Y.applyUpdate(this.doc, fromBase64(message.state), "remote");
             this.state.seq = message.seq;
             this.state.instance = message.instance;
             this.initialized = true;
-            this.state.status = "online";
-            this.state.error = "";
+            if (this.state.status !== "blocked") {
+              this.state.status = "online";
+              this.state.error = "";
+            }
             this.inflight.clear();
             await this.cache.save(this.scope, Y.encodeStateAsUpdate(this.doc));
             await this.flush();
@@ -181,6 +199,7 @@ export class Sync {
       };
       socket.onclose = () => {
         if (this.socket !== socket || this.stopped) return;
+        clearTimeout(this.handshake);
         this.initialized = false;
         this.socket = null;
         this.inflight.clear();
@@ -193,9 +212,11 @@ export class Sync {
       };
       socket.onerror = () => socket.close();
     } catch {
-      this.state.status = "offline";
+      if (this.state.status !== "blocked") this.state.status = "offline";
       this.emit();
     } finally {
+      clearTimeout(deadline);
+      this.opening = undefined;
       this.connecting = false;
     }
   }
@@ -222,10 +243,15 @@ export class Sync {
       }),
     );
   }
-  async stop() {
+  stop() {
+    return (this.stopWork ??= this.shutdown());
+  }
+  private async shutdown() {
     this.stopped = true;
     window.removeEventListener("offline", this.offline);
     window.removeEventListener("online", this.online);
+    this.opening?.abort();
+    clearTimeout(this.handshake);
     clearTimeout(this.retry);
     clearTimeout(this.flushTimer);
     clearInterval(this.heartbeat);

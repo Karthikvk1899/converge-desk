@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 const Markdown = lazy(() => import("react-markdown"));
 import type { Principal } from "../shared/protocol.ts";
 import { Sync, type SyncState } from "./sync.ts";
+import { LocalCache } from "./cache.ts";
 const Editor = lazy(() =>
   import("./Editor.tsx").then((m) => ({ default: m.Editor })),
 );
@@ -92,7 +93,15 @@ export function App() {
     const provider = new Sync(actor, current.id, token, (s) => {
       if (!closed) {
         setStatus(s);
-        setBody(provider.doc.getText("body").toString());
+        const content = provider.doc.getText("body").toString();
+        setBody(content);
+        setDocs((previous) =>
+          previous.map((document) =>
+            document.id === current.id
+              ? { ...document, characters: content.length, seq: s.seq }
+              : document,
+          ),
+        );
       }
     });
     void provider
@@ -473,12 +482,27 @@ export function App() {
                       This browser keeps a local copy after disconnect.{" "}
                       <button
                         className="text-button"
-                        disabled={!sync || (status?.pending ?? 0) > 0}
+                        disabled={
+                          !sync ||
+                          !status?.durable ||
+                          (status?.pending ?? 0) > 0
+                        }
                         onClick={() =>
                           run(async () => {
                             if (!sync) return;
-                            await sync.cache.clear(sync.scope);
+                            const scope = sync.scope;
                             setCurrent(null);
+                            await sync.stop();
+                            const cache = new LocalCache();
+                            try {
+                              if ((await cache.pending(scope)).length)
+                                throw new Error(
+                                  "Pending edits were preserved; reopen the document to synchronize them.",
+                                );
+                              await cache.clear(scope);
+                            } finally {
+                              await cache.close();
+                            }
                             setNotice(
                               "Local copy cleared. The server document is unchanged.",
                             );

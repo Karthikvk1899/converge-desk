@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { principal, create, request } from "../tests/client.ts";
+import { principal, create, request, Peer } from "../tests/client.ts";
 import { randomUUID } from "node:crypto";
 async function signIn(page: Page, token: string, title: string) {
   await page.goto("/");
@@ -103,4 +103,42 @@ test("pending edits survive page reload before server acknowledgment", async ({
   await expect(page.getByTestId("pending")).toHaveText("0 pending", {
     timeout: 30000,
   });
+});
+
+test("large validated remote edits render and raw HTML cannot execute in preview", async ({
+  page,
+}) => {
+  const a = await principal("render-" + randomUUID().slice(0, 8), "Alice");
+  const d = await create(
+    a.token,
+    "Rendering boundary",
+    '# Safe heading\n\n<script>alert(1)</script>\n<img src="https://example.invalid/x" onerror="alert(1)">\n',
+  );
+  await signIn(page, a.token, "Rendering boundary");
+  const editor = page.getByRole("textbox", { name: "Document editor" });
+  await editor.press("ControlOrMeta+End");
+  await editor.pressSequentially("Local draft.");
+  await expect(page.getByTestId("pending")).toHaveText("0 pending", {
+    timeout: 30000,
+  });
+  const peer = await Peer.connect(a.token, d.id);
+  try {
+    await peer.ack(
+      peer.send(peer.edit("remote-start " + "x".repeat(5000) + " remote-end")),
+    );
+    await expect(
+      page.getByRole("textbox", { name: "Document editor" }),
+    ).toContainText("remote-end");
+    await editor.press("ControlOrMeta+z");
+    await expect(editor).not.toContainText("Local draft.");
+    await expect(editor).toContainText("remote-end");
+    await page.getByRole("button", { name: "Preview", exact: true }).click();
+    await expect(page.locator(".markdown h1")).toHaveText("Safe heading");
+    await expect(page.locator(".markdown script, .markdown img")).toHaveCount(
+      0,
+    );
+    await expect(page.locator(".markdown")).toContainText("remote-end");
+  } finally {
+    peer.close();
+  }
 });
