@@ -1,0 +1,76 @@
+name: converge-desk
+x-app: &app
+  build: {context: ., target: api}
+  image: converge-desk-api:local
+  init: true
+  read_only: true
+  tmpfs: [/tmp]
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  environment: &env
+    DATABASE_URL: postgresql://desk:local-dev-only@db:5432/desk
+    REDIS_URL: redis://redis:6379
+    ADMIN_KEY: ${ADMIN_KEY:?Run node scripts/init-env.mjs}
+    PUBLIC_ORIGIN: http://localhost:3000
+  depends_on:
+    migrate: {condition: service_completed_successfully}
+    redis: {condition: service_healthy}
+  healthcheck:
+    test: [CMD, node, -e, "fetch('http://localhost:8080/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+    interval: 3s
+    timeout: 5s
+    retries: 30
+services:
+  db:
+    image: postgres:17-alpine
+    environment: {POSTGRES_USER: desk, POSTGRES_PASSWORD: local-dev-only, POSTGRES_DB: desk}
+    volumes: [data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U desk -d desk]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  migrate:
+    build: {context: ., target: api}
+    image: converge-desk-api:local
+    environment: *env
+    command: [node, server/migrate.ts]
+    depends_on:
+      db: {condition: service_healthy}
+  api1:
+    <<: *app
+    ports: [127.0.0.1:8081:8080]
+    environment:
+      <<: *env
+      INSTANCE_ID: replica-a
+  api2:
+    <<: *app
+    ports: [127.0.0.1:8082:8080]
+    environment:
+      <<: *env
+      INSTANCE_ID: replica-b
+  web:
+    build: {context: ., target: web}
+    ports: [127.0.0.1:3000:8080]
+    depends_on:
+      api1: {condition: service_healthy}
+      api2: {condition: service_healthy}
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+  integration:
+    build: {context: ., target: test}
+    profiles: [test]
+    environment:
+      ADMIN_KEY: ${ADMIN_KEY}
+      API_A: http://api1:8080
+      API_B: http://api2:8080
+      PUBLIC_ORIGIN: http://localhost:3000
+volumes:
+  data:
