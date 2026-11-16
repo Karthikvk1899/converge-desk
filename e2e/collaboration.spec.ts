@@ -43,11 +43,13 @@ test("two browsers merge offline edits, persist unsent work, checkpoint and prev
   });
   await page.context().setOffline(false);
   await expect(page.locator(".connection")).toHaveText("online");
-  await expect(editor).toContainText("Bob found a fix.");
-  await expect(remote).toContainText("Offline finding.");
+  // Reconnection starts draining a bounded, one-operation-at-a-time outbox.
+  // Wait for durable acknowledgments before asserting remote convergence.
   await expect(page.getByTestId("pending")).toHaveText("0 pending", {
     timeout: 30000,
   });
+  await expect(editor).toContainText("Bob found a fix.", { timeout: 10000 });
+  await expect(remote).toContainText("Offline finding.", { timeout: 10000 });
   await page.getByLabel("Checkpoint label").fill("Reviewed handoff");
   await page
     .getByRole("button", { name: "Save checkpoint", exact: true })
