@@ -26,7 +26,7 @@ Credentials are generated locally and kept out of git. The seed command prints f
 
 ## What makes this project different
 
-This project tackles concurrent human editing, browser persistence, and reconnection. It complements reconciliation (Ledger Bridge), admission control (Quota Forge), workflow compensation (Saga Harbor), webhook delivery (Relay Foundry), and stream monitoring (Signal Loom).
+This project tackles concurrent human editing, browser persistence, and reconnection. It complements reconciliation (Ledger Bridge), admission control (Quota Forge), workflow compensation (Saga Harbor), webhook delivery (Relay Foundry), and reviewed feature releases (Signal Loom).
 
 | Area | Working implementation |
 | --- | --- |
