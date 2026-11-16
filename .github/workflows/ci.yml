@@ -1,26 +1,88 @@
-name: Publish source
-on: [push, workflow_dispatch]
+name: CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  publish:
-    if: github.actor == 'Karthikvk1899'
+  checks:
+    name: TypeScript, unit, build, dependency audit
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Materialize reviewed source
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with: {node-version: '24', cache: npm}
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm audit --audit-level=moderate
+      - run: node scripts/openapi.ts && git diff --exit-code docs/openapi.json
+  integration:
+    name: Two replicas, browser collaboration, failure recovery
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with: {node-version: '24', cache: npm}
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Start quickstart stack
         run: |
-          python3 - <<'PYTHON'
-          import base64,json,pathlib,zlib
-          files=json.loads(zlib.decompress(base64.b64decode('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')))
-          for name,content in files.items():
-              path=pathlib.Path(name)
-              assert not path.is_absolute() and '..' not in path.parts
-              path.parent.mkdir(parents=True,exist_ok=True)
-              path.write_text(content)
-          PYTHON
-          git config user.name "Karthik Beesa"
-          git config user.email "261053759+Karthikvk1899@users.noreply.github.com"
-          git add .
-          git diff --cached --quiet || git commit -m "Harden browser recovery and authorization regression coverage"
-          git push
+          node scripts/init-env.mjs
+          docker compose up -d --build --wait
+          docker compose exec -e API_A=http://localhost:8080 api1 node scripts/seed.ts > /dev/null
+      - name: API and WebSocket integration
+        run: docker compose run --build --rm --no-deps integration
+      - name: Real browser collaboration and offline recovery
+        run: |
+          set -a
+          . ./.env
+          set +a
+          npm run e2e
+      - name: Redis, replica, and PostgreSQL interruption
+        run: |
+          set -a
+          . ./.env
+          set +a
+          node scripts/faults.ts
+      - name: Isolated PostgreSQL backup and restoration
+        run: |
+          set -a
+          . ./.env
+          set +a
+          node scripts/backup-restore.ts
+      - name: Container logs
+        if: failure()
+        run: docker compose logs --no-color --tail=120
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: browser-evidence
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+      - if: always()
+        run: docker compose down -v
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066
+        with:
+          languages: javascript-typescript
+          build-mode: none
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066
