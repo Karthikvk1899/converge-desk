@@ -16,8 +16,10 @@ Three new state-machine tests were executed against the original published `cc3a
 
 Additional tests exercise stalled ticket requests, missing initial snapshots, idempotent cleanup, cross-tenant history/checkpoints, viewer checkpoint/fork denial, large remote edits, collaborative undo, and raw-HTML preview suppression.
 
+An isolated PostgreSQL logical backup/restore rehearsal additionally checks credentials, checkpoints, CRDT state, duplicate replay and subsequent edits.
+
 Local unit tests, TypeScript, formatting, and production builds can validate only part of this change. The added service/browser cases require the Docker and Chromium CI jobs. Until this revision has a passing GitHub Actions run, the earlier published CI result does not verify it.
 
 ## Remaining deployment work
 
-No claim is made about AWS deployment, database HA, backup restoration, capacity under sustained load, TLS configuration, SSO integration, comprehensive accessibility conformance, container-image vulnerability status, or a live external security review. Opaque bearer credentials still lack automatic expiry and tenant roles are not document ACLs. Document and history growth remains bounded by explicit limits rather than retention/compaction. The editor bundle still exceeds Vite's default 500 kB chunk warning threshold; it is lazy loaded, and no measured frontend performance budget has been qualified.
+No claim is made about AWS deployment, database HA, production disaster recovery, capacity under sustained load, TLS configuration, SSO integration, comprehensive accessibility conformance, container-image vulnerability status, or a live external security review. Opaque bearer credentials still lack automatic expiry and tenant roles are not document ACLs. Document and history growth remains bounded by explicit limits rather than retention/compaction. The editor bundle still exceeds Vite's default 500 kB chunk warning threshold; it is lazy loaded, and no measured frontend performance budget has been qualified.

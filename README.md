@@ -84,7 +84,10 @@ set -a
 set +a
 npm run e2e
 node scripts/faults.ts
+node scripts/backup-restore.ts
 ```
+
+The backup/restore rehearsal creates a uniquely named disposable database and checks restored credential hashes, checkpoints, CRDT state, idempotent retry, and continued editing. It removes only that test database.
 
 The failure script intentionally stops the project's Redis, one API replica, and PostgreSQL, then restores them. Use it only against the local demo stack. Browser evidence is retained as a CI artifact for seven days.
 
@@ -95,7 +98,7 @@ Unit tests exercise CRDT convergence under reordering, duplicate application, de
 This is a working reference system, not a production-qualified hosted product. There are no claimed throughput or latency benchmarks, AWS deployment, multi-region guarantees, or production availability results.
 
 - Credentials are scoped opaque bearer tokens with editor/viewer roles per tenant. OIDC/SSO, granular document ACLs, invitations, and credential expiry are not implemented.
-- PostgreSQL is a single node. Acknowledgment durability depends on its WAL/storage configuration. Backup restoration, failover, and regional disaster recovery are not qualified.
+- PostgreSQL is a single node. Acknowledgment durability depends on its WAL/storage configuration. CI includes an isolated logical backup/restore rehearsal; production backup policy, failover, and regional disaster recovery are not qualified.
 - Browser storage may be evicted or fail. The UI reports local persistence errors and offers Markdown export. Cached documents remain after disconnect; clearing site data removes them.
 - Update history and checkpoints have no automatic retention. Documents are capped at 100,000 text characters and 512 KiB encoded CRDT state; a long edit history can reach the state cap first. Fork a checkpoint to start a fresh document.
 - Search/document lists and history/checkpoint panels return at most 50 entries. This is a bounded workspace, not an unbounded document management system.

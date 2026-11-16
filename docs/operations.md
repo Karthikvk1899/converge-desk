@@ -26,7 +26,7 @@ Run `node scripts/faults.ts` only on the disposable Compose demo. It stops servi
 
 The `data` volume holds the authoritative database; Redis is not backed up. A snapshot must include principals, documents, updates, checkpoints, and schema version together. For an offline exercise, stop writes, then use PostgreSQL's supported `pg_dump`/`pg_restore` tooling and verify row counts, document contents, checkpoint forks, and deduplication behavior in a separate stack. Do not restore a subset of update records independently of snapshots.
 
-A backup older than an acknowledged edit can lose that edit. Browser caches are not a backup: after acknowledgments, outbox items are removed. RPO/RTO, point-in-time recovery, encryption, retention, and restoration testing must be established before a deployment handles valuable data. No successful backup/restore qualification is claimed here.
+A backup older than an acknowledged edit can lose that edit. Browser caches are not a backup: after acknowledgments, outbox items are removed. RPO/RTO, point-in-time recovery, encryption, retention, and restoration testing must be established before a deployment handles valuable data. The `node scripts/backup-restore.ts` CI rehearsal restores a logical dump into a uniquely named disposable database. It checks a fixture’s credential hash, checkpoint, CRDT snapshot, sequence, duplicate retry, and subsequent editing; it also verifies the source document remains unchanged. The temporary database is removed in a finally block. This does not establish production RPO/RTO, PITR, physical restore, encrypted-backup recovery, or large-dataset behavior.
 
 ## Configuration and deployment boundary
 
