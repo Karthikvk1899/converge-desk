@@ -124,7 +124,9 @@ test("large validated remote edits render and raw HTML cannot execute in preview
   const peer = await Peer.connect(a.token, d.id);
   try {
     await peer.ack(
-      peer.send(peer.edit("remote-start " + "x".repeat(5000) + " remote-end")),
+      peer.send(
+        peer.edit("\n\nremote-start " + "x".repeat(5000) + " remote-end"),
+      ),
     );
     await expect(
       page.getByRole("textbox", { name: "Document editor" }),
